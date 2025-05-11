@@ -1,0 +1,38 @@
+device: cuda
+distributed: false  # Set true to enable torch.distributed
+data_parallel: false  # Set true to enable DataParallel
+vision_encoder:
+  model_name: openai/clip-vit-base-patch16
+  device: cuda
+retriever:
+  dim: 512
+  index_path: mmrag/data/faiss.index
+  text_encoder_name: all-MiniLM-L6-v2
+  device: cuda
+fusion:
+  embed_dim: 512
+  num_heads: 8
+  dropout: 0.1
+  fusion_type: attention  # Options: attention, gated, transformer
+generator:
+  model_name: meta-llama/Llama-2-7b-hf
+  adapter_path: null
+  device: cuda
+  use_lora: true
+  use_adapter_fusion: false  # Set true to use AdapterFusion
+  fusion_adapter_names: []   # List of adapter names/paths for fusion
+  lora_r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+adapter_trainer:
+  model_name: meta-llama/Llama-2-7b-hf
+  max_length: 512
+  batch_size: 2
+  lr: 2e-5
+  use_adapter_fusion: false  # Set true to use AdapterFusion
+  fusion_adapter_names: []   # List of adapter names/paths for fusion
+  lora:
+    r: 8
+    lora_alpha: 16
+    lora_dropout: 0.05
+    target_modules: ["q_proj", "v_proj"] 
