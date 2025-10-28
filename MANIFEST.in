@@ -1,0 +1,5 @@
+include README.md
+include LICENSE
+include mmrag/requirements.txt
+recursive-include mmrag/configs *.yaml
+recursive-include examples *.py *.jpg *.png *.txt

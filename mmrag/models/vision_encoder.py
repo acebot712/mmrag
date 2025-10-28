@@ -12,7 +12,11 @@ class VisionEncoder(nn.Module):
     def __init__(self, model_name: str = 'openai/clip-vit-base-patch16', device: Optional[Union[str, torch.device]] = None):
         super().__init__()
         self.model_name = model_name
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        # Handle auto device detection
+        if device == "auto" or device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
         self.model = CLIPModel.from_pretrained(model_name).to(self.device)
         self.processor = CLIPProcessor.from_pretrained(model_name)
         self.eval()

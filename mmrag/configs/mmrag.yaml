@@ -1,14 +1,14 @@
-device: cuda
+device: auto  # auto, cuda, or cpu - auto will detect GPU availability
 distributed: false  # Set true to enable torch.distributed
 data_parallel: false  # Set true to enable DataParallel
 vision_encoder:
   model_name: openai/clip-vit-base-patch16
-  device: cuda
+  device: auto  # auto, cuda, or cpu
 retriever:
   dim: 512
   index_path: mmrag/data/faiss.index
   text_encoder_name: all-MiniLM-L6-v2
-  device: cuda
+  device: auto  # auto, cuda, or cpu
 fusion:
   embed_dim: 512
   num_heads: 8
@@ -17,7 +17,7 @@ fusion:
 generator:
   model_name: meta-llama/Llama-2-7b-hf
   adapter_path: null
-  device: cuda
+  device: auto  # auto, cuda, or cpu
   use_lora: true
   use_adapter_fusion: false  # Set true to use AdapterFusion
   fusion_adapter_names: []   # List of adapter names/paths for fusion

@@ -17,7 +17,11 @@ class FaissRetriever:
         device: Optional[Union[str, torch.device]] = None
     ):
         self.dim = dim
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        # Handle auto device detection
+        if device == "auto" or device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
         self.text_encoder = SentenceTransformer(text_encoder_name, device=self.device)
         self.index = faiss.IndexFlatIP(dim)
         self.doc_ids: List[str] = []

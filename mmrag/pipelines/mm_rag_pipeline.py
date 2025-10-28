@@ -15,7 +15,12 @@ class MMRAGPipeline:
     """
     def __init__(self, config_path: str):
         self.config = OmegaConf.load(config_path)
-        self.device = self.config.device or ("cuda" if torch.cuda.is_available() else "cpu")
+        # Handle auto device detection
+        device_config = self.config.get("device", "auto")
+        if device_config == "auto":
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device_config
         self.vision_encoder = VisionEncoder(**self.config.vision_encoder)
         self.retriever = FaissRetriever(**self.config.retriever)
         self.fusion = CrossModalFusionBlock(**self.config.fusion)
@@ -37,17 +42,32 @@ class MMRAGPipeline:
         # 2. Retrieve docs (hybrid)
         docs = self.retriever.hybrid_search(text_query, image_emb.cpu().numpy(), top_k=top_k)
         doc_texts = [d[2] for d in docs if d[2] is not None]
+
         # 3. Encode text query and docs
         text_emb = torch.tensor(self.retriever.encode_text(text_query), device=self.device)  # (1, D)
-        doc_embs = torch.tensor(self.retriever.encode_text(doc_texts), device=self.device) if doc_texts else torch.zeros((1, 1, image_emb.shape[-1]), device=self.device)
-        # 4. Prepare for fusion
-        image_emb = image_emb.unsqueeze(1) if image_emb.dim() == 2 else image_emb  # (B, 1, D)
-        text_emb = text_emb.unsqueeze(1) if text_emb.dim() == 2 else text_emb  # (B, 1, D)
-        doc_embs = doc_embs.unsqueeze(0) if doc_embs.dim() == 2 else doc_embs  # (B, K, D)
+
+        # Handle empty docs case properly
+        if doc_texts:
+            doc_embs = torch.tensor(self.retriever.encode_text(doc_texts), device=self.device)
+        else:
+            # Create dummy doc embedding with proper shape
+            doc_embs = torch.zeros((1, image_emb.shape[-1]), device=self.device)
+
+        # 4. Prepare for fusion - ensure all tensors have (B, seq, D) shape
+        if image_emb.dim() == 2:
+            image_emb = image_emb.unsqueeze(1)  # (B, 1, D)
+        if text_emb.dim() == 2:
+            text_emb = text_emb.unsqueeze(1)  # (B, 1, D)
+        if doc_embs.dim() == 2:
+            doc_embs = doc_embs.unsqueeze(0)  # (B, K, D)
+
         # 5. Fuse
         fused = self.fusion(image_emb, text_emb, doc_embs)  # (B, 1, D)
+
         # 6. Generate
-        prompt = text_query + "\n" + "\n".join(doc_texts)
+        prompt = text_query
+        if doc_texts:
+            prompt += "\n\nRelevant context:\n" + "\n".join(doc_texts)
         answer = self.generator.generate(prompt, fused_emb=fused.squeeze(1))
         return answer
 
@@ -57,13 +77,27 @@ class MMRAGPipeline:
         for i, (img_emb, query) in enumerate(zip(image_embs, text_queries)):
             docs = self.retriever.hybrid_search(query, img_emb.unsqueeze(0).cpu().numpy(), top_k=top_k)
             doc_texts = [d[2] for d in docs if d[2] is not None]
+
             text_emb = torch.tensor(self.retriever.encode_text(query), device=self.device)
-            doc_embs = torch.tensor(self.retriever.encode_text(doc_texts), device=self.device) if doc_texts else torch.zeros((1, 1, img_emb.shape[-1]), device=self.device)
+
+            # Handle empty docs case
+            if doc_texts:
+                doc_embs = torch.tensor(self.retriever.encode_text(doc_texts), device=self.device)
+            else:
+                doc_embs = torch.zeros((1, img_emb.shape[-1]), device=self.device)
+
+            # Prepare tensors
             img_emb = img_emb.unsqueeze(0).unsqueeze(1)  # (1, 1, D)
-            text_emb = text_emb.unsqueeze(1)
-            doc_embs = doc_embs.unsqueeze(0) if doc_embs.dim() == 2 else doc_embs
+            if text_emb.dim() == 2:
+                text_emb = text_emb.unsqueeze(1)  # (1, 1, D)
+            if doc_embs.dim() == 2:
+                doc_embs = doc_embs.unsqueeze(0)  # (1, K, D)
+
             fused = self.fusion(img_emb, text_emb, doc_embs)
-            prompt = query + "\n" + "\n".join(doc_texts)
+
+            prompt = query
+            if doc_texts:
+                prompt += "\n\nRelevant context:\n" + "\n".join(doc_texts)
             answer = self.generator.generate(prompt, fused_emb=fused.squeeze(1))
             answers.append(answer)
         return answers 

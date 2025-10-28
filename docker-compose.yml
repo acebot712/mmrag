@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  mmrag-api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mmrag/data:/app/mmrag/data
+      - ./mmrag/configs:/app/mmrag/configs
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: uvicorn mmrag.api.app:app --host 0.0.0.0 --port 8000 --reload
+
+  mmrag-dev:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: bash
+    stdin_open: true
+    tty: true

@@ -19,7 +19,11 @@ class Generator:
         lora_alpha: int = 16,
         lora_dropout: float = 0.05
     ):
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        # Handle auto device detection
+        if device == "auto" or device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
         self.tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
         if use_lora:
